@@ -412,7 +412,7 @@ Very early silicon, internal SoC R&D.
 
 == Divisions
 
-There are three divisions of the benchmark suite, the Closed division, the Network division, and the Open
+There are two divisions of the benchmark suite, the Closed division and the Open
 division.
 
 === Closed Division
@@ -423,117 +423,6 @@ division allows calibration for quantization and does not allow any retraining.
 
 The unqualified name “MLPerf” must be used when referring to a Closed Division
 suite result, e.g. “a MLPerf result of 4.5.”
-
-=== Network Division
-
-The Network division inherits all requirements from the Closed division and imposes further constraints.
-In the Network division the SUT is connected to the Loadgen system over a network fabric. The Query Dispatch Library (QDL) component is a submitter-implemented SUT proxy that runs on the Loadgen system. The Network division supports only the Datacenter suite.
-Non-conforming network submission should be submitted to Open category, under the Open category constraints.
-
-==== QDL Constraints
-
-* The QDL is not allowed to do any pre-processing. e.g. changing of precision, or data layout.
-* The QDL is not allowed to do any post-processing of the responses, e.g. gather, reduction, or ArgMax.
-* If an SUT compresses its output, the QDL must decompress the output. Decompression is a timed operation. No other post-processing in the QDL is allowed.
-* The QDL is not allowed to batch queries.
-* The QDL is not allowed to pad the data in queries.
-* The QDL is not allowed to cache queries or responses.
-* The QDL is implementing the network function of the LoadGen Node towards the SUT node and handles the required processing. E.G. padding of the payload as required by the network protocol.
-* The QDL should reflect a single SUT to the LoadGen. LoadGen operates with a single SUT.
-* The Name method's return value must contain the substring "Network SUT".
-* The Name method's implementation must include at least one round trip over the network. The Name method must not return until the round trip is complete.
-* The QDL must query each SUT Node for its name and aggregate the responses in the Name Method. Each SUT Node must have a unique name.
-
-The submission must include source code for the QDL implementation above the level of the OSI session layer (RPC or equivalent), and sufficient documentation of the session layer API that a reader of that code can understand what data is being marshalled and sent over the network for each query.
-
-==== General Constraints
-
-MLPerf distinguishes between fabric interconnects and bus interconnects. Fabric interconnects are required and bus interconnects are forbidden.
-
-A fabric interconnect must:
-
-1. Work as out-of-the-box chassis-to-chassis interconnect
-1. Use wireless, copper, or fiber-optics media
-1. Suitable for connecting systems above 10 meters distance
-1. Use switch topology
-1. Be highly scalable, reliable, and fault-tolerant
-
-Currently permitted fabric interconnects are Ethernet, IEEE802.11, Infiniband, and 3GPP.
-
-Examples of forbidden bus interconnect include: PCIe/CXL/CCIX, Hypertransport, NVLink, QPI, UPI, and ICI (interchip interconnect).
-
-Additionally, any interconnect not listed in the permitted list is forbidden unless clearance is first obtained from the MLPerf Inference WG.
-
-System Topology: The SUT and QDL must run on physically separate and distinct systems. The SUT can contain multiple Nodes. The systems can be connected point to point or through network elements like switches.
-
-Fabric and protocol must be reported in the submission metadata. Submission metadata must be sufficient to determine OSI layers one through four of the submission's network stack.
-
-==== SUT over the Network and Setup Constraints
-
-* SUT parameters and configuration must be uniquely and specifically named in the submission results.
-* Everything outside the LoadGen node should be considered as part of the SUT, for instance for counting power and latency. As an example, components outside the nodes like a switch or load balancer should be considered part of the SUT.
-* All queries must be transferred over the network, carrying the inference data, for inference execution at the SUT. All responses must be transferred back over the network, carrying the inference responses.
-* Caching/Storing of the queries and inference data or responses for further use at the SUT is disallowed. It is allowed to cache/store other data like Neural Network weights or Neural Network executable.
-* SUT can do the required pre-processing of the data, e.g. Batching, Padding, processing of the requests (precision, data layout), compression, decompression. SUT can do the required post processing functions e.g. gather, reduction or ArgMax.
-* The report must contain network interface characteristics for both the Loadgen and SUT systems, and every other component through which data passes between Loadgen and SUT. The information must be sufficient for reproducibility.
-* A system diagram must be included in the submission that shows how the components between the LoadGen node and the SUT nodes are connected, accompanied by any text necessary for another submitter to understand the diagram.
-* For "Available" submissions, for reproducibility, it is required to specify software version of all components, hardware configurations, software stacks, dockers, and settings of all components and stacks.
-
-==== Benchmarks and QSL Preprocessing
-
-Data formats for inputs and outputs are allowed to be compressed for network transmission, providing a tradeoff between compute and network bandwidth. Data transferred between the LoadGen system and the SUT can be compressed using one of the options from the following table for each benchmark. Compression is performed by QSL, and is untimed. The compression scheme needs approval by the Working Group, allowing compression schemes that will be suitable for production, so for example, very asymmetric schemes are not expected to be approved.
-
-|===
-|*Area* | *Task* | *Model* | *QSL side PreProcessing^(1,2,3)^*
-|Vision | Image classification | Resnet50-v1.5 | Allow one of the following compression options for pre-processing:
-
-1) No compression 2) Lossless compression 3) The original compression of the dataset (JPEG)
-|Vision | Object detection (large) | Retinanet | Allow one of the following compression options for pre-processing:
-
-1) No compression 2) Lossless compression 3) The original compression of the dataset (For the Coco dataset JPEG, for Open Images JPEG)
-|Vision | Medical image segmentation | 3D UNET | Allow one of the following compression options:
-
-1) No compression 2) Lossless compression
-
-This rule applies both for the QSL pre-processing and for post-processing function allowed in QDL for this benchmark results.
-
-|Language | Language processing | BERT-large | Input is either Token IDs, Input Masks and Segment IDs or just the Token IDs (generating the other tensors at the SUT in a timed operation).
-
-1) No compression 2) Lossless compression
-
-|Language | Summarization | Llama3.1-8B | Input is either Token IDs, Input Masks and Input Lengths or just the Token IDs (the other tensors are generated at the SUT in a timed operation).
-
-No compression allowed.
-|Language | Question Answering | Llama2-70b | Input is either Token IDs, Input Masks and Input Lengths or just the Token IDs (the other tensors are generated at the SUT in a timed operation).
-
-No compression allowed.
-|Language | Question Answering | Llama3.1-405B | Input is either Token IDs, Input Masks and Input Lengths or just the Token IDs (the other tensors are generated at the SUT in a timed operation).
-
-No compression allowed.
-|Language | Text Generation | Mixtral-8x7B | Input is either Token IDs, Input Masks and Input Lengths or just the Token IDs (the other tensors are generated at the SUT in a timed operation).
-
-No compression allowed.
-|Language | Reasoning | DeepSeek-r1 | Input is either Token IDs, Input Masks and Input Lengths or just the Token IDs (the other tensors are generated at the SUT in a timed operation).
-
-No compression allowed.
-|Commerce | Recommendation | DLRMv3 | QDL sends query (Batch of samples).
-
-Allow one of the following compression options for pre-processing:
-
-1) No compression 2) Lossless compression
-
-Allow any lossless compression that will be suitable for production use.
-In Server mode allow per-Query compression.
-|Generative | Text to video | WAN-2.2-T2V-A14B | No compression allowed.
-|Vision | Visual Language Model | Qwen3-VL-235B-A22B | No compression allowed.
-
-|Graph | Node Classification | RGAT | No compression allowed.
-
-|===
-
-. Compression scheme needs pre-approval, at least two weeks before a submission deadline.
-. A compression scheme may use information from the training set, but not the validation set (ex: check index probability).
-. Only per-Sample compression is allowed, except for DLRMv3 Server mode where per-Query compression is allowed.
 
 === Open Division
 
