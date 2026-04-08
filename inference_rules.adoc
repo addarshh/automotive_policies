@@ -326,18 +326,11 @@ The execution of LoadGen is restricted as follows:
   from the most logical source, which is usually the network or an I/O device such as a camera. It may be pinned.
   Similarly, the response provided to Loadgen must be stored in the DRAM that most faithfully simulates transfer
   to the most logical destination, which is a CPU process unless otherwise specified for the benchmark.
-  From 4.0, submitters must provide with their submission sufficient details of the system architecture and software to
-  show how the I/O bandwidth utilized by each benchmark/scenario combination can be transferred between the memory where the trace is stored and
-  the network or I/O device. Minimum bandwidths for each benchmark can be found in <<appendix-bw>>. All components mentioned in the system architecture must be present in the system during the run. A system architecture description must be provided along with the submission, which must include:
-
-** Bandwidth of each NIC and total number of NIC(s)
-** Description of the data path from the NIC(s) to the accelerator(s)
-** Specifications or measurements indicating that the path from the NIC to the memory in which loadgen data resides can sustain the required bandwidth
-
+  
 * Caching values derived from the shapes of input tensors is allowed. Caching of any other queries, query parameters, or intermediate results is
   prohibited. In particular, caching values derived from activations is prohibited.
 
-* The LoadGen must be compiled from a tagged approved revision of the mlperf/inference
+* The LoadGen must be compiled from a tagged approved revision of the mlperf/automotive
   GitHub repository without alteration.  Pull requests addressing portability
   issues and adding new functionality are welcome.
 
@@ -447,8 +440,7 @@ For each benchmark, MLPerf will provide pointers to:
 For each benchmark, MLPerf will provide pointers to:
 
 * A calibration data set, to be used for quantization (see quantization
-  section), that is a small subset of the training data set used to generate the
-  weights
+  section), that is a small subset of the data set.
 
 Each reference implementation shall include a script to verify the datasets
 using a checksum. The dataset must be unchanged at the start of each run.
@@ -457,18 +449,14 @@ using a checksum. The dataset must be unchanged at the start of each run.
 
 As input, before preprocessing:
 
-* all imaging benchmarks take uncropped uncompressed bitmap
+* all imaging benchmarks take uncropped uncompressed bitmaps
 
-* BERT, Llama2-70b, Llama3.1-405B, Mixtral-8x7B, Llama3.1-8B and DeepSeek-r1 take texts
-
-* RNN-T and Whisper takes a waveform
-
-* DLRMv3 takes a request containing one user and up to 100 candidates
+* Llama3.1-8B take text prompts
 
 Sample-independent pre-processing that matches the reference model is
 untimed. However, it must be pre-approved and added to the following list:
 
-* May resize to processed size (e.g. SSD-large)
+* May resize to processed size (e.g. BEVFormer-tiny)
 
 * May reorder channels / do arbitrary transpositions
 
@@ -488,9 +476,7 @@ run result.
 
 === Test Data Traversal Order
 
-Test data is determined by the LoadGen. For scenarios where processing multiple
-samples can occur (i.e., and offline), any ordering is
-allowed subject to latency requirements.
+Test data is determined by the LoadGen.
 
 == Model
 
@@ -584,8 +570,6 @@ Examples of allowed techniques include, but are not limited to:
 * Sorting an embedding table based on frequency of access in the training set.
   (Submitters should include in their submission details of how the ordering was
   derived.)
-
-* Speculative decoding is allowed subject to constraints in <<appendix-speculative-decoding>>, only for certain LLM workloads including - DeepSeek-r1-Interactive.
 
 The following techniques are disallowed:
 
@@ -872,65 +856,4 @@ For our implementation, we use:
 * c = .99.
 
 
-[[appendix-bw]]
-[appendix]
-== Datacenter Bandwidth Requirements
 
-Datacenter systems must satisfy both the ingress and egress bandwidth requirements for each benchmark.
-
-=== Ingress Bandwidth
-Datacenter systems must provide at least the following bandwidths from the network or I/O device to the location where the trace is stored (e.g. DRAM). The minimum bandwidth is a function of the throughput achieved by the SUT and the input data types. The formulas below assume that the inputs are not pre-processed in any way (e.g. padded). If the inputs are pre-processed, and pre-processing affects the input size, submitters must adjust the formulas below accordingly.
-
-|===
-|Area |Model |Dataset | Symbolic input size formula | Numeric input size formula | Minimum network bandwidth (bytes/sec)
-|Vision |Resnet50-v1.5 |ImageNet (224x224) | __C*H*W*dtype_size__ | __3*224*224*dtype_size__ | __throughput*150528*dtype_size__
-|Vision |Retinanet |OpenImages (800x800) | __C*H*W*dtype_size__ | __3*800*800*dtype_size__ | __throughput*1920000*dtype_size__
-|Vision |3D UNET | KiTS 2019 | __avg(C*D*H*W)*dtype_size__footnote:3d_unet_bw[The average image size above is the average image size of the inference cases specified in https://github.com/mlcommons/inference/blob/master/vision/medical_imaging/3d-unet-kits19/meta/inference_cases.json[inference_cases.json].] | __32944795*dtype_size__ | __throughput*32944795*dtype_size__
-|Language |BERT |SQuAD v1.1 (max_seq_len=384) | __num_inputs*max_seq_len*dtype_size__ | __3*384*dtype_size__ | __throughput*1152*dtype_size__
-|Language |Llama3.1-8B |CNN Dailymail (v3.0.0, max_seq_len=2048) | __max_seq_len*dtype_size__ | __2048*dtype_size__ | __throughput*2048*dtype_size__
-|Language |Llama2-70b |OpenOrca (max_seq_len=1024) | __max_seq_len*dtype_size__ | __1024*dtype_size__ | __throughput*1024*dtype_size__
-|Language |Llama3.1-405B | Subset of LongBench, LongDataCollections, Ruler, GovReport | __max_seq_len*dtype_size__ | __20000*dtype_size__ | __throughput*20000*dtype_size__
-|Language |Mixtral-8x7B |OpenOrca (5k samples, max_seq_len=2048), GSM8K (5k samples of the train split, max_seq_len=2048), MBXP (5k samples, max_seq_len=2048) | __max_seq_len*dtype_size__ | __2048*dtype_size__ | __throughput*2048*dtype_size__
-|Language |DeepSeek-r1| mlperf_deepseek_r1| __max_seq_len*dtype_size__ | __3136*dtype_size__ | __throughput*3136*dtype_size__
-|Language |GPT-OSS-120B| AIME25, GPQA Diamond, LiveCodeBench v6| __max_seq_len*dtype_size__ | __15330*dtype_size__ | __throughput*15330*dtype_size__
-|Vision |QWen3-VL-235B-A22B| Shopify Product Catalogue| __(text_size+image_size+chat_completion_template_size+http_header_size)__ | __27051*dtype_size__ | __throughput*27051*dtype_size__
-|Commerce |DLRMv3 | Synthetic Streaming 100B Dataset |__(2 + 6*uih_seq_len + 6*num_candidates)*int64_size__footnote:[Each DLRMv3 request contains 1 UIH sequence (user_id, item_id, ratings, timestamps, weights, category_id) and 2048 candidate features (6 int64 features per candidate).] |__98368__footnote:[DLRMv3: (2 + 6*1 + 6*2048) * 8 = 98368 bytes per sample.] | __throughput*98368__
-|Generative |WAN-2.2-T2V-A14B |VBench prompts | negligible | negligible |  __> 0__
-|Graph |RGAT |IGBH | negligible | negligible | __> 0__
-|===
-=== Egress Bandwidth
-
-Datacenter systems must provide at least the following bandwidths from the output location (e.g. DRAM) to the network or I/O device. The minimum bandwidth is a function of the throughput achieved by the SUT and the output data types. For all models except 3D Unet, WAN-2.2-T2V-A14B, and LLMs (Llama2-70b, Llama3.1-405B, Mixtral-8x7B, DeepSeek-r1, GPT-OSS-120B, Qwen3-VL-235B-A22B), the output sizes are negligible. Therefore, for those models, the egress bandwidth must simply be greater than 0.
-
-|===
-|Area |Model |Dataset | Symbolic output size formula | Numeric output size formula | Minimum network bandwidth (bytes/sec)
-|Vision |Resnet50-v1.5 |ImageNet (224x224) | negligible | negligible | __> 0__
-|Vision |Retinanet |OpenImages (800x800) | negligible | negligible | __> 0__
-|Vision |3D UNET | KiTS 2019 | __avg(C*D*H*W)*dtype_size__footnote:3d_unet_bw[] | __32944795*dtype_size__ | __throughput*32944795*dtype_size__
-|Language |BERT |SQuAD v1.1 (max_seq_len=384) | negligible | negligible | __> 0__
-|Language |Llama3.1-8B |CNN Dailymail (v3.0.0, max_seq_len=2048) | negligible | negligible | __> 0__
-|Language |Llama2-70b |OpenOrca (max_seq_len=1024) | __max_output_len*dtype_size__ | __1024*dtype_size__ | __throughput*1024*dtype_size__
-|Language |Llama3.1-405B |Subset of LongBench, LongDataCollections, Ruler, GovReport | __max_output_len*dtype_size__ | __20000*dtype_size__ | __throughput*20000*dtype_size__
-|Language |Mixtral-8x7B  |OpenOrca (5k samples, max_seq_len=2048), GSM8K (5k samples of the train split, max_seq_len=2048), MBXP (5k samples, max_seq_len=2048) | __max_output_len*dtype_size__ | __2048*dtype_size__ | __throughput*2048*dtype_size__
-|Language |DeepSeek-r1| mlperf_deepseek_r1| __max_seq_len*dtype_size__ | __20000*dtype_size__ | __throughput*20000*dtype_size__
-|Language |GPT-OSS-120B| AIME25, GPQA Diamond, LiveCodeBench v6| __max_output_len*dtype_size__ | __32768*dtype_size__ (accuracy), __10000*dtype_size__ (performance) | __throughput*max_new_tokens*dtype_size__
-|Vision |QWen3-VL-235B-A22B| Shopify Product Catalogue| __json_response_size__footnote:[QWen3-VL-235B-A22B outputs a JSON object containing category (hierarchical path), brand, and is_secondhand fields.] | __~500*dtype_size__ | __throughput*500*dtype_size__
-|Commerce |DLRMv3 |Synthetic Streaming 100B Dataset | negligible | negligible | __> 0__
-|Generative |WAN-2.2-T2V-A14B |VBench prompts | __video_frames*height*width*channels*dtype_size__ | __81*720*1280*3*dtype_size__footnote:[WAN-2.2-T2V-A14B outputs 720p videos with 81 frames.] | __throughput*224,870,400*dtype_size__
-|Graph |RGAT |IGBH | negligible | negligible | __> 0__
-|===
-
-[[appendix-speculative-decoding]]
-[appendix]
-== Speculative Decoding
-
-Speculative decoding is allowed for specific benchmark/scenario combinations as listed below.
-All Implementations must use the reference MTP (Multi-Token Prediction) Head at the same precision as provided, with the reference speculative-decoding algorithm and configuration.
-
-Implementations that artificially manipulate acceptance rates are disallowed, eg: using a different MTP head or continued pre-training of reference MTP head, quantization of the reference MTP head weights, post-training techniques on reference MTP head (like fine-tuning, RLHF etc.)
-
-|===
-|Benchmark |Scenario |Speculative Decoding Algorithm |Configuration |MTP Head
-
-|DeepSeek-r1 |Interactive |EAGLE-style decoding with deepseek-ai/deepseek-r1 MTP head |`speculative-num-steps=3`, `speculative-eagle-topk=1.0` |https://huggingface.co/deepseek-ai/DeepSeek-R1
-|===
