@@ -681,14 +681,9 @@ against ground truth in COCO dataset. COCO eval is not possible in production.
 
 === Softmax
 
-Q: In classification and segmentation models (ResNet50, 3DUNet) the final softmax does not change the order of class probabilities. Can it be omitted?
+Q: In classification and segmentation models (Deeplabv3+) the final softmax does not change the order of class probabilities. Can it be omitted?
 
 A: Yes.
-
-=== DLRMv3
-Q: Why must DLRMv3 queries be issued in time series order rather than randomized?
-
-A: DLRMv3 is designed to capture sequential recommendation characteristics where users make incremental visits over time. The dataset is organized as a time series of user interactions across 100 timestamps, and queries must be issued in this temporal order to accurately represent real-world streaming recommendation scenarios. This time series ordering also enables potential future implementations of KV-cache optimizations, where user history embeddings can be cached and incrementally updated as new interactions arrive, similar to how KV-cache is used in LLM inference.
 
 === LLM Benchmarks
 
@@ -722,18 +717,6 @@ A: The size of the KV-cache is determined by the batch size. The KV-cache size c
 Q: Is it allowed to apply continuous batching (or dynamic batching) for auto-generative benchmarks?
 
 A: Yes. Continuous batching is explained at a high level here: https://www.anyscale.com/blog/continuous-batching-llm-inference.
-
-=== RGAT
-
-Q: Is loading the node neighbors a timed operation?
-
-A: Yes, this is the main operation of this benchmark
-
-=== Whisper
-
-Q: Whisper's native audio input duration is fixed at 30 seconds. Is it permitted to modify the loaded duration to match the sample's specific duration?
-
-A: No, it is not permitted to modify the loaded duration even if continuing to meet the model's accuracy threshold. Samples must be zero-padded to ensure consistent computation and accuracy criteria.
 
 === Audit
 
