@@ -395,6 +395,112 @@ High safety integrity compute with availability
 | Typically ASIL-B and above at system level.
 |===
 
+==== Hardened submission package
+
+A submission in the Hardened category MUST set `status` to `hardened` in its system
+description and MUST additionally provide a hardened disclosure package as the file
+`<division>/<submitter>/systems/<system_desc>_hardened.json`. The package is validated
+during the review period by the submission checker. It contains all ordinary MLCommons
+submission artifacts plus the production-readiness disclosures below.
+
+Sensitive or proprietary material is NOT expected to be placed in the package. For each
+component the package records an immutable identifier (repository URL + commit hash,
+release tag, build ID, binary checksum, or an internal source identifier). The artifact
+itself is made available to a neutral third-party auditor under the standard MLCommons
+audit and NDA process described in the Audit Process section.
+
+The package MUST declare:
+
+* `hardened_package_version` — the package format version (e.g. `v1.0`).
+* `system_desc_id` — MUST equal the basename of the system description it accompanies.
+* `hardened_profile` — one of `IVI`, `ADAS`, `AD`, selecting the profile in the table
+  above. This selects which safety/security evidence is mandatory (see below).
+
+===== Production-intended software inventory
+
+A list of every software component used while running the benchmark. Each entry MUST
+state its functional role, supplier/owner, provenance (`open-source`, `proprietary`,
+or `mixed`), an immutable identifier, and two booleans: whether it was
+`used_during_benchmark` and whether it is `intended_for_production`. This separates
+benchmark-only utilities from the production path (firmware, drivers, model compiler,
+runtime libraries, graph executors, safety wrappers, application orchestration).
+
+===== Software bill of materials
+
+The package MUST decompose the system into two component-level lists:
+
+* `build_toolchain_bom` — everything that produces the deployable artifact (training/
+  export tooling, ML compiler, optimizer, quantizer, calibration tool, packaging). Each
+  entry MUST give name, role, version, and materially-relevant configuration flags. For
+  `quantizer` and `calibration_tool` roles the entry MUST describe the calibration set
+  used; consistent with the Weight Definition and Quantization rules, calibration MUST
+  use only the benchmark-owner-provided calibration data.
+* `runtime_execution_bom` — everything that loads and executes the artifact on the
+  target SoC: firmware (with delivery method), kernel/user-space drivers, operating
+  system (kernel version + hardening profile), the AI runtime / inference engine /
+  safety runtime (with configuration: device selection, scheduling mode, batching), and
+  the application + benchmark harness. For application and harness components the entry
+  MUST give the run command and how the application connects to the runtime and to
+  LoadGen.
+
+===== Open-source, proprietary, and licensing disclosure
+
+* Open-source components MUST be disclosed by name, upstream URL, an immutable
+  identifier (release tag or commit hash), and role. If a component carries local
+  patches or is a fork, the package MUST provide either a patch/fork reference or, when
+  it cannot be shared, a feature-level description of what changed, the component
+  boundary, its inputs and outputs, and whether it affects kernel/tactic selection.
+* Proprietary components that affect the compiled artifact or its execution MUST be
+  enumerated with owner, version/build ID, interface role, a unique internal
+  identifier or checksum, the distribution model, and whether the component is
+  available to external customers.
+* A licensing summary MUST state, per component, the license family, whether binary and
+  source redistribution are allowed, and any additional terms (e.g. NDA, safety manual
+  required, field-of-use restriction).
+
+===== Reproducibility and model-compilation recipe
+
+The package MUST reference the public MLPerf Automotive implementation and results/logs
+repositories with a pinned commit hash. The compiled model is NOT shipped; instead the
+package MUST provide, per model, a reproducible compilation recipe: ordered steps
+(inline commands or script URIs), the compiler configuration, and a principled
+quantization description (subject to the same "much smaller than the non-zero weights"
+standard as the Quantization rules). Given the same environment and toolchain, the
+recipe MUST be sufficient to reproduce the deployable artifact.
+
+For target-dependent autotuning flows (e.g. TensorRT-style builders), the recipe MUST
+include the autotuning configuration; submitters SHOULD pin a timing cache so tactic
+selection is reproducible. A recipe that relies on autotuning but omits this
+configuration is not considered reproducible.
+
+===== Safety and security evidence
+
+MLPerf Automotive does not certify safety. The package records the submitter's stated
+anticipated ML-stack production safety goal and the evidence required by the profile:
+
+* `IVI` — security manual.
+* `ADAS` — security manual, safety manual, and tool qualification.
+* `AD` — security manual, safety manual, and tool qualification.
+
+Each referenced document MUST give a name and version and state how an auditor obtains
+it. Hardware qualification (e.g. AEC-Q100) SHOULD be listed. Evidence of an attempt at
+or progress toward certification MAY be included; when present, each entry MUST name the
+standard (e.g. ISO 26262, ISO 21448, ISO 21434) and a status of `none`, `planned`,
+`in_progress`, `assessment`, or `certified`. For QM (non-ASIL) NPU IP, the package MUST
+point to the relevant safety manual and system-level assumptions covering ASIL needs
+where applicable.
+
+===== Validation
+
+The hardened package is validated by `tools/submission/hardened_checker.py`, invoked by
+the submission checker immediately after a system's `status` is confirmed to be
+`hardened`. A missing required section or field, an ADAS/AD submission lacking a safety
+manual or tool qualification, a quantizer without a calibration description, an
+application/harness without a run command, a target-dependent autotuning recipe without
+autotuning configuration, an audit identifier that pins no build, or an undisclosed
+local patch each invalidate the submission.
+
+
 === Development System
 
 Known as EVM (EValuation Model) and is generally what SiPs provide.
